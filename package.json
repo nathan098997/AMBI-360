@@ -1,0 +1,46 @@
+{
+  "name": "ambi360",
+  "version": "1.0.0",
+  "description": "Plataforma de Tours Virtuais 360° com gestão de projetos e hotspots interativos",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "setup": "npm install && node scripts/setup-database.js",
+    "db:create": "mysql -u root -p < database.sql",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "360",
+    "virtual-tour",
+    "panorama",
+    "hotspots",
+    "web-viewer"
+  ],
+  "author": "Nathan098997",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nathan098997/ambi360.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nathan098997/ambi360/issues"
+  },
+  "homepage": "https://github.com/nathan098997/ambi360#readme"
+}
