@@ -65,8 +65,9 @@ CREATE TABLE hotspots (
     hotspot_type ENUM('normal', 'door', 'info', 'custom') DEFAULT 'normal',
     icon_type VARCHAR(50) DEFAULT 'normal_1',
     
-    -- Imagem de destino
-    target_image_url VARCHAR(500),
+    -- Imagens de origem e destino
+    source_image_url VARCHAR(500) NOT NULL, -- Imagem onde o hotspot aparece
+    target_image_url VARCHAR(500),          -- Imagem de destino
     
     -- Desbloqueio progressivo
     unlock_order INT DEFAULT 0,
@@ -82,6 +83,7 @@ CREATE TABLE hotspots (
     
     INDEX idx_project_id (project_id),
     INDEX idx_parent_hotspot (parent_hotspot_id),
+    INDEX idx_source_image (source_image_url),
     INDEX idx_unlock_order (unlock_order)
 );
 
@@ -142,6 +144,10 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 -- =============================================
 -- Views úteis para consultas
 -- =============================================
+
+-- Remover views existentes se houver
+DROP VIEW IF EXISTS projects_summary;
+DROP VIEW IF EXISTS hotspots_hierarchy;
 
 -- View: Projetos com contagem de hotspots
 CREATE VIEW projects_summary AS

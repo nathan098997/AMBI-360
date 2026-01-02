@@ -19,7 +19,11 @@ Uma plataforma completa para criação e visualização de tours virtuais 360° 
 - **Editor de Hotspots**: Adicione pontos interativos com preview em tempo real
 - **Logos Personalizadas**: Upload de logos para cada projeto
 - **Modo Escuro**: Interface adaptável para diferentes preferências
-- **Backup Automático**: Sistema de backup no GitHub
+- **Sistema de Upload**: Upload seguro de imagens panorâmicas e logos
+- **Autenticação JWT**: Sistema de login seguro com tokens
+- **Dashboard Analytics**: Estatísticas de acesso e uso
+- **Gerenciamento de Usuários**: Controle completo de usuários e permissões
+- **API RESTful**: API completa para integrações externas
 
 ## 🛠️ Tecnologias Utilizadas
 
@@ -48,10 +52,35 @@ AMBI-360/
 ├── backend/                 # Servidor Node.js
 │   ├── server.js            # Servidor principal
 │   ├── config/              # Configurações
-│   │   └── db.js            # Conexão com banco
+│   │   ├── db.js            # Conexão com banco
+│   │   ├── app.config.js    # Configuração central
+│   │   └── upload.js        # Configuração de upload
+│   ├── controllers/         # Controladores da API
+│   │   ├── auth.controller.js
+│   │   ├── projects.controller.js
+│   │   ├── hotspots.controller.js
+│   │   ├── progress.controller.js
+│   │   ├── admin.controller.js
+│   │   └── upload.controller.js
 │   ├── routes/              # Rotas da API
-│   └── models/              # Modelos de dados
+│   │   ├── auth.routes.js
+│   │   ├── projects.routes.js
+│   │   ├── hotspots.routes.js
+│   │   ├── progress.routes.js
+│   │   ├── admin.routes.js
+│   │   └── upload.routes.js
+│   └── middleware/          # Middlewares
+│       ├── auth.middleware.js
+│       └── validation.middleware.js
+├── scripts/                 # Scripts utilitários
+│   ├── setup-database.js    # Configuração do banco
+│   └── quick-start.js       # Inicialização rápida
+├── uploads/                 # Arquivos enviados
+│   ├── panoramas/           # Imagens 360°
+│   ├── logos/               # Logos dos projetos
+│   └── general/             # Outros arquivos
 ├── database.sql             # Estrutura do banco de dados
+├── API_DOCUMENTATION.md     # Documentação da API
 ├── .env.example             # Exemplo de variáveis de ambiente
 ├── .gitignore               # Arquivos ignorados pelo Git
 ├── package.json             # Dependências do projeto
@@ -64,6 +93,30 @@ AMBI-360/
 - Node.js (versão 14 ou superior)
 - MySQL (versão 5.7 ou superior)
 - Git
+
+### 🚀 Inicialização Rápida
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/nathan098997/ambi360.git
+cd ambi360
+
+# 2. Instale as dependências
+npm install
+
+# 3. Configuração automática (recomendado)
+npm run quick-start
+
+# 4. Configure o arquivo .env com suas credenciais
+# Edite o arquivo .env criado automaticamente
+
+# 5. Inicie o servidor
+npm start
+```
+
+### 📋 Configuração Manual
+
+Se preferir configurar manualmente:
 
 ### 1. Clone o repositório
 ```bash
@@ -100,7 +153,13 @@ DB_PASSWORD=sua_senha_aqui
 DB_NAME=ambi360_db
 ```
 
-### 4. Inicie o servidor
+### 4. Configuração inicial do banco
+```bash
+# Criar usuário admin e dados de exemplo
+npm run setup
+```
+
+### 5. Inicie o servidor
 ```bash
 # Desenvolvimento (com auto-reload)
 npm run dev
@@ -109,14 +168,52 @@ npm run dev
 npm start
 ```
 
-### 5. Acesse a aplicação
-- Frontend: http://localhost:3000
-- API: http://localhost:3000/api
+### 6. Acesse a aplicação
+- Frontend: http://localhost:3001
+- API: http://localhost:3001/api
+- Health Check: http://localhost:3001/api/health
+
+## 📚 Documentação da API
+
+O AMBI360 possui uma API RESTful completa para integrações externas. Veja a documentação completa em [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
+
+### Endpoints Principais
+
+- **Autenticação**: `/api/auth/login`, `/api/auth/register`
+- **Projetos**: `/api/projects` (CRUD completo)
+- **Hotspots**: `/api/hotspots` (CRUD completo)
+- **Progresso**: `/api/progress` (sistema Google Maps)
+- **Admin**: `/api/admin` (dashboard, usuários, logs)
+- **Upload**: `/api/upload` (panoramas, logos)
+- **Health**: `/api/health` (status da API)
+
+### Exemplo de Uso
+
+```javascript
+// Login
+const response = await fetch('/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: 'admin',
+    password: 'admin123'
+  })
+});
+
+const { data } = await response.json();
+const token = data.token;
+
+// Buscar projetos
+const projects = await fetch('/api/projects', {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+```
 
 ## 🔐 Configuração de Segurança
 
 ### Credenciais Padrão
-- **Senha Admin**: `admin123` (altere após primeiro acesso)
+- **Email**: `admin@ambi360.com`
+- **Senha**: `admin123` (altere após primeiro acesso)
 
 ### Configuração do .env
 ```env

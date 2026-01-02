@@ -1,5 +1,15 @@
-// AMBI360 - Versão com LocalStorage
+// AMBI360 - Versão Standalone (LocalStorage)
 const ADMIN_PASSWORD = 'admin123';
+
+const DEFAULT_PROJECTS = {
+    'projeto-demo': {
+        password: '123456',
+        image: 'https://pannellum.org/images/alma.jpg',
+        title: 'Projeto Demo',
+        createdAt: new Date().toISOString(),
+        hotspots: []
+    }
+};
 
 let projects = {};
 let viewer = null;
@@ -20,10 +30,10 @@ function loadProjects() {
         try {
             return JSON.parse(saved);
         } catch (e) {
-            console.warn('Erro ao carregar projetos');
+            console.warn('Erro ao carregar projetos salvos');
         }
     }
-    return {};
+    return { ...DEFAULT_PROJECTS };
 }
 
 function saveProjects() {
@@ -37,13 +47,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
-    // Login admin
     const adminForm = document.getElementById('adminForm');
     if (adminForm) {
         adminForm.addEventListener('submit', handleAdminLogin);
     }
 
-    // Upload de arquivos
     const logoUpload = document.getElementById('logoUpload');
     if (logoUpload) {
         logoUpload.addEventListener('change', handleLogoUpload);
@@ -54,7 +62,6 @@ function setupEventListeners() {
         imageUpload.addEventListener('change', handleImageUpload);
     }
 
-    // Controles de hotspot
     const addHotspotBtn = document.getElementById('addHotspotBtn');
     if (addHotspotBtn) {
         addHotspotBtn.addEventListener('click', () => setAddHotspotMode(true));
@@ -65,13 +72,11 @@ function setupEventListeners() {
         removeHotspotBtn.addEventListener('click', removeAllHotspots);
     }
 
-    // Criar projeto
     const createProjectForm = document.getElementById('createProjectForm');
     if (createProjectForm) {
         createProjectForm.addEventListener('submit', handleCreateProject);
     }
 
-    // Logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
     if (adminLogoutBtn) {
         adminLogoutBtn.addEventListener('click', logout);
@@ -147,7 +152,7 @@ function createProjectCard(name, project) {
     return card;
 }
 
-async function handleCreateProject(e) {
+function handleCreateProject(e) {
     e.preventDefault();
     
     const nameRaw = document.getElementById('newProjectName').value.trim();
@@ -162,9 +167,9 @@ async function handleCreateProject(e) {
     if (projects[name] && !editingProjectName) return showToast('Projeto já existe!', 'danger');
 
     if (editingProjectName && !imageFile) {
-        await updateExistingProject(name, title, logoFile);
+        updateExistingProject(name, title, logoFile);
     } else {
-        await createNewProject(name, title, imageFile, logoFile);
+        createNewProject(name, title, imageFile, logoFile);
     }
 }
 
@@ -193,7 +198,7 @@ function createNewProject(name, title, imageFile, logoFile) {
     reader.readAsDataURL(imageFile);
 }
 
-async function updateExistingProject(name, title, logoFile) {
+function updateExistingProject(name, title, logoFile) {
     const existingProject = projects[editingProjectName];
     if (!existingProject) return;
     
@@ -221,7 +226,7 @@ async function updateExistingProject(name, title, logoFile) {
     }
 }
 
-async function saveProject(name, projectData) {
+function saveProject(name, projectData) {
     projects[name] = projectData;
     saveProjects();
     
@@ -253,7 +258,6 @@ function showViewer(projectName) {
         projectLogo.style.display = 'none';
     }
     
-    // Carregar hotspots do projeto
     projectHotspots = project.hotspots || [];
     currentScene = 'main';
     
@@ -283,7 +287,6 @@ function initializeViewer(project) {
             
             viewer.on('scenechange', handleSceneChange);
         } else {
-            // Carregar hotspots diretamente na cena principal se não há cenas múltiplas
             viewer = pannellum.viewer('panorama', {
                 type: 'equirectangular',
                 panorama: project.image,
@@ -304,7 +307,6 @@ function initializeViewer(project) {
     }
 }
 
-// Função para criar hotspots da cena principal
 function createMainSceneHotspots(hotspotsArray) {
     if (!hotspotsArray || hotspotsArray.length === 0) return [];
     
@@ -335,7 +337,6 @@ function createScenesConfig(mainImage, hotspotsArray) {
         } 
     };
     
-    // Filtrar pontos ROOT para cena principal
     const rootHotspots = hotspotsArray.filter(h => !h.parentId);
     
     rootHotspots.forEach(hotspot => {
@@ -349,12 +350,10 @@ function createScenesConfig(mainImage, hotspotsArray) {
             cssClass: getHotspotClass(hotspot.type, hotspot.typeImage)
         });
         
-        // Criar cena se tem imagem de destino
         if (hotspot.targetImage) {
             const sceneId = 'scene_' + hotspot.id;
             const hotSpots = [];
             
-            // Botão voltar
             hotSpots.push({
                 id: `back_${sceneId}`,
                 pitch: -10,
@@ -365,7 +364,6 @@ function createScenesConfig(mainImage, hotspotsArray) {
                 cssClass: 'hotspot-back'
             });
             
-            // Filhos diretos
             const childHotspots = hotspotsArray.filter(child => child.parentId === hotspot.id);
             childHotspots.forEach(child => {
                 hotSpots.push({
@@ -389,6 +387,7 @@ function createScenesConfig(mainImage, hotspotsArray) {
     
     return scenes;
 }
+
 function updateNavigation() {
     const navRooms = document.getElementById('navRooms');
     if (!navRooms) return;
@@ -400,7 +399,6 @@ function updateNavigation() {
     mainBtn.textContent = 'Cena Principal';
     navRooms.appendChild(mainBtn);
     
-    // Mostrar hotspots com imagens como navegação
     const mainHotspots = projectHotspots.filter(h => !h.parentId && h.targetImage);
     
     mainHotspots.forEach((hotspot) => {
@@ -415,10 +413,8 @@ function updateNavigation() {
 }
 
 function handleSceneChange(sceneId) {
-    console.log('Mudou para cena:', sceneId);
     currentScene = sceneId;
     
-    // Atualizar navegação ativa
     const navButtons = document.querySelectorAll('.nav-room');
     navButtons.forEach(btn => btn.classList.remove('active'));
     
@@ -462,7 +458,7 @@ function editProject(name) {
     showSection('create');
 }
 
-async function deleteProject(name) {
+function deleteProject(name) {
     if (confirm(`Excluir projeto "${projects[name].title}"?`)) {
         delete projects[name];
         saveProjects();
@@ -719,7 +715,6 @@ function changeHotspotType(id, type) {
     if (hotspot) {
         hotspot.type = type;
         
-        // Alternar imagem baseada no tipo
         if (type === 'door') {
             hotspot.typeImage = hotspot.typeImage === 'porta 1.png' ? 'porta 2.png' : 'porta 1.png';
         } else {
@@ -975,65 +970,4 @@ function loadTheme() {
         const isDark = document.body.classList.contains('dark');
         btn.textContent = isDark ? 'Modo Claro' : 'Modo Escuro';
     }
-}
-
-function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-}
-
-function showHelpModal() {
-    document.getElementById('helpModal').classList.remove('hidden');
-}
-
-function closeHelpModal() {
-    document.getElementById('helpModal').classList.add('hidden');
-}
-
-function toggleNavigation() {
-    if (isAdminViewing) {
-        if (viewer) {
-            viewer.destroy();
-            viewer = null;
-        }
-        document.getElementById('viewerContainer').classList.add('hidden');
-        document.getElementById('adminPanel').classList.remove('hidden');
-        isAdminViewing = false;
-    } else {
-        logout();
-    }
-}
-
-function slugify(str) {
-    return (str || '')
-        .toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-function showError(message) {
-    const errorDiv = document.getElementById('errorMessage');
-    errorDiv.textContent = message;
-    errorDiv.classList.remove('hidden');
-}
-
-function hideError() {
-    document.getElementById('errorMessage').classList.add('hidden');
-}
-
-function showToast(message, type = 'success') {
-    const errorDiv = document.getElementById('errorMessage');
-    if (!errorDiv) return alert(message);
-    
-    errorDiv.textContent = message;
-    errorDiv.className = `error ${type}`;
-    errorDiv.classList.remove('hidden');
-    
-    setTimeout(() => {
-        errorDiv.classList.add('hidden');
-        errorDiv.className = 'error';
-    }, 3000);
 }
