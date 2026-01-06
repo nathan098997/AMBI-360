@@ -75,6 +75,7 @@ function restoreAppState() {
 
 const DEFAULT_PROJECTS = {
     'projeto-demo': {
+        password: '123456',
         image: 'https://pannellum.org/images/alma.jpg',
         title: 'Projeto Demo',
         createdAt: new Date().toISOString(),
@@ -328,41 +329,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
 
-function initializePublicViewer(projectParam) {
-    initDB().then(() => {
-        return loadProjects();
-    }).then(loadedProjects => {
-        projects = loadedProjects;
-        
-        if (projects[projectParam]) {
-            showViewer(projectParam);
-        } else {
-            showProjectNotFound();
-        }
-    }).catch(error => {
-        console.error('Erro ao carregar projeto:', error);
-        projects = loadProjectsFromLocalStorage();
-        
-        if (projects[projectParam]) {
-            showViewer(projectParam);
-        } else {
-            showProjectNotFound();
-        }
-    });
-}
-
-function showProjectNotFound() {
-    document.body.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial, sans-serif;">
-            <div style="text-align: center; color: white; max-width: 400px; padding: 40px;">
-                <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
-                <h2 style="font-size: 24px; margin-bottom: 15px;">Projeto não encontrado</h2>
-                <p style="font-size: 16px; margin-bottom: 30px; opacity: 0.9;">O projeto solicitado não existe ou foi removido.</p>
-            </div>
-        </div>
-    `;
-}
-
 function initializeApp() {
     initDB().then(() => {
         return loadProjects();
@@ -456,23 +422,15 @@ function setupEventListeners() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', logout);
     }
-    
-    // Salvar URL do site quando alterada
-    const siteUrlInput = document.getElementById('siteUrl');
-    if (siteUrlInput) {
-        siteUrlInput.addEventListener('change', saveProjectSettings);
-        siteUrlInput.addEventListener('blur', saveProjectSettings);
-    }
-    
-    // Carregar configurações salvas
-    setTimeout(loadProjectSettings, 100);
 }
 
 function handleAdminLogin(e) {
     e.preventDefault();
+    console.log('Login tentativa iniciada');
     
     const passwordInput = document.getElementById('adminPassword');
     if (!passwordInput) {
+        console.error('Campo de senha não encontrado');
         return;
     }
     
@@ -487,9 +445,11 @@ function handleAdminLogin(e) {
     // Simular autenticação (senha: admin123)
     setTimeout(() => {
         if (password === 'admin123') {
+            console.log('Login bem-sucedido');
             hideError();
             showAdminPanel();
         } else {
+            console.error('Senha incorreta');
             showError('Senha incorreta. Use: admin123');
         }
         
@@ -510,8 +470,6 @@ function showAdminPanel() {
 function updateProjectsGrid() {
     const grid = document.getElementById('projectsGrid');
     const emptyState = document.getElementById('emptyState');
-    const sortOrder = document.getElementById('sortOrder')?.value || 'newest';
-    
     grid.innerHTML = '';
     
     const projectEntries = Object.entries(projects);
@@ -520,13 +478,6 @@ function updateProjectsGrid() {
         emptyState.classList.remove('hidden');
         return;
     }
-    
-    // Ordenar projetos por data
-    projectEntries.sort(([,a], [,b]) => {
-        const dateA = new Date(a.createdAt);
-        const dateB = new Date(b.createdAt);
-        return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
-    });
     
     emptyState.classList.add('hidden');
     
@@ -552,52 +503,11 @@ function createProjectCard(name, project) {
             <div class="project-actions">
                 <button class="btn-sm btn-view" onclick="previewProject('${name}')">👁️ Ver</button>
                 <button class="btn-sm btn-edit" onclick="editProject('${name}')">✏️ Editar</button>
-                <button class="btn-sm btn-secondary" onclick="shareProject('${name}')">🔗 Compartilhar</button>
                 <button class="btn-sm btn-delete" onclick="deleteProject('${name}')">🗑️ Excluir</button>
             </div>
         </div>
     `;
     return card;
-}
-
-// Função para compartilhar projeto diretamente do card
-function shareProject(projectName) {
-    const project = projects[projectName];
-    if (!project) return;
-    
-    // Comprimir apenas imagem principal
-    compressImageForShare(project.image, 300, 0.2).then(compressedMainImage => {
-        const shareData = {
-            t: project.title,
-            i: compressedMainImage,
-            l: null,
-            h: []
-        };
-        
-        const compressed = btoa(JSON.stringify(shareData));
-        
-        const siteUrlInput = document.getElementById('siteUrl');
-        const baseUrl = siteUrlInput ? siteUrlInput.value.trim() : 'https://nathan098997.github.io/visualizador-360';
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-        const projectUrl = `${cleanBaseUrl}/view.html?d=${compressed}`;
-        
-        copyToClipboard(projectUrl, 'Link do projeto copiado!');
-    });
-}
-
-function saveProjectSettings() {
-    const siteUrl = document.getElementById('siteUrl')?.value;
-    if (siteUrl) {
-        localStorage.setItem('ambi360_site_url', siteUrl);
-    }
-}
-
-function loadProjectSettings() {
-    const savedUrl = localStorage.getItem('ambi360_site_url');
-    const siteUrlInput = document.getElementById('siteUrl');
-    if (savedUrl && siteUrlInput) {
-        siteUrlInput.value = savedUrl;
-    }
 }
 
 function compressImage(file, maxWidth = 3840, quality = 0.95) {
@@ -1559,8 +1469,6 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-
-
 function toggleFullscreen() {
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
@@ -1576,146 +1484,6 @@ function showHelpModal() {
 function closeHelpModal() {
     document.getElementById('helpModal').classList.add('hidden');
 }
-
-// Funcionalidades de Compartilhamento
-function showShareModal() {
-    if (!currentProjectName) return;
-    
-    const project = projects[currentProjectName];
-    if (!project) return;
-    
-    const modal = document.getElementById('shareModal');
-    const shareUrl = document.getElementById('shareUrl');
-    const embedCode = document.getElementById('embedCode');
-    
-    // Comprimir apenas imagem principal - sem hotspots com imagens
-    compressImageForShare(project.image, 300, 0.2).then(compressedMainImage => {
-        const shareData = {
-            t: project.title,
-            i: compressedMainImage,
-            l: project.logo ? null : null, // Remover logo para reduzir tamanho
-            h: [] // Sem hotspots com imagens para compartilhamento
-        };
-        
-        const compressed = btoa(JSON.stringify(shareData));
-        
-        const siteUrlInput = document.getElementById('siteUrl');
-        const baseUrl = siteUrlInput ? siteUrlInput.value.trim() : 'https://nathan098997.github.io/visualizador-360';
-        const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-        
-        // Usar caminho relativo para view.html
-        const projectUrl = `${cleanBaseUrl}/view.html?d=${compressed}`;
-        
-        shareUrl.value = projectUrl;
-        embedCode.value = `<iframe src="${projectUrl}" width="800" height="600" frameborder="0" allowfullscreen></iframe>`;
-        
-        modal.classList.remove('hidden');
-    });
-}
-
-function compressImageForShare(dataUrl, maxWidth, quality = 0.2) {
-    return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        
-        img.onload = function() {
-            const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
-            canvas.width = img.width * ratio;
-            canvas.height = img.height * ratio;
-            
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        
-        img.src = dataUrl;
-    });
-}
-
-function closeShareModal() {
-    document.getElementById('shareModal').classList.add('hidden');
-}
-
-function copyShareUrl() {
-    const shareUrl = document.getElementById('shareUrl');
-    copyToClipboard(shareUrl.value, 'Link copiado com sucesso!');
-}
-
-function copyEmbedCode() {
-    const embedCode = document.getElementById('embedCode');
-    copyToClipboard(embedCode.value, 'Código copiado com sucesso!');
-}
-
-function copyToClipboard(text, successMessage) {
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-            showShareToast(successMessage);
-        }).catch(() => {
-            fallbackCopyToClipboard(text, successMessage);
-        });
-    } else {
-        fallbackCopyToClipboard(text, successMessage);
-    }
-}
-
-function fallbackCopyToClipboard(text, successMessage) {
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.left = '-999999px';
-    textArea.style.top = '-999999px';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-        document.execCommand('copy');
-        showShareToast(successMessage);
-    } catch (err) {
-        console.error('Erro ao copiar:', err);
-        prompt('Copie o texto abaixo:', text);
-    }
-    
-    textArea.remove();
-}
-
-function showShareToast(message) {
-    const toast = document.getElementById('shareToast');
-    const messageElement = toast.querySelector('.toast-message');
-    
-    messageElement.textContent = message;
-    toast.classList.remove('hidden');
-    
-    setTimeout(() => {
-        toast.classList.add('hidden');
-    }, 3000);
-}
-
-function shareOnWhatsApp() {
-    const shareUrl = document.getElementById('shareUrl').value;
-    const text = encodeURIComponent(`Confira este tour virtual 360°: ${shareUrl}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
-}
-
-function shareOnFacebook() {
-    const shareUrl = document.getElementById('shareUrl').value;
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
-}
-
-function shareOnTwitter() {
-    const shareUrl = document.getElementById('shareUrl').value;
-    const text = encodeURIComponent(`Confira este tour virtual 360°`);
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}`, '_blank');
-}
-
-function shareByEmail() {
-    const shareUrl = document.getElementById('shareUrl').value;
-    const subject = encodeURIComponent('Tour Virtual 360°');
-    const body = encodeURIComponent(`Olá!\n\nGostaria de compartilhar este tour virtual 360° com você:\n\n${shareUrl}\n\nAproveite a experiência!`);
-    window.open(`mailto:?subject=${subject}&body=${body}`);
-}
-
-
 
 function toggleNavigation() {
     if (isAdminViewing) {

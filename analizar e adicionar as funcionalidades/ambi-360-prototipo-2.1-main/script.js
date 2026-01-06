@@ -1,5 +1,19 @@
-// AMBI360 - Versão com LocalStorage
-const ADMIN_PASSWORD = 'admin123';
+// AMBI360 - Versão com IndexedDB
+const STORAGE_KEY = 'ambi360_projects';
+const DB_NAME = 'ambi360_db';
+const DB_VERSION = 1;
+
+let db = null;
+
+const DEFAULT_PROJECTS = {
+    'projeto-demo': {
+        password: '123456',
+        image: 'https://pannellum.org/images/alma.jpg',
+        title: 'Projeto Demo',
+        createdAt: new Date().toISOString(),
+        hotspots: []
+    }
+};
 
 let projects = {};
 let viewer = null;
@@ -14,34 +28,136 @@ let isAdminViewing = false;
 let currentScene = 'main';
 let projectHotspots = [];
 
+// Inicializar IndexedDB
+async function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            db = request.result;
+            resolve(db);
+        };
+        
+        request.onupgradeneeded = (event) => {
+            db = event.target.result;
+            if (!db.objectStoreNames.contains('projects')) {
+                db.createObjectStore('projects', { keyPath: 'id' });
+            }
+        };
+    });
+}
+
+// Salvar projeto no IndexedDB
+async function saveProjectToDB(id, projectData) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['projects'], 'readwrite');
+        const store = transaction.objectStore('projects');
+        const request = store.put({ id, ...projectData });
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Carregar projeto do IndexedDB
+async function loadProjectFromDB(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['projects'], 'readonly');
+        const store = transaction.objectStore('projects');
+        const request = store.get(id);
+        
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Carregar todos os projetos do IndexedDB
+async function loadAllProjectsFromDB() {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['projects'], 'readonly');
+        const store = transaction.objectStore('projects');
+        const request = store.getAll();
+        
+        request.onsuccess = () => {
+            const result = {};
+            request.result.forEach(project => {
+                result[project.id] = project;
+            });
+            resolve(result);
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Deletar projeto do IndexedDB
+async function deleteProjectFromDB(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['projects'], 'readwrite');
+        const store = transaction.objectStore('projects');
+        const request = store.delete(id);
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
 function loadProjects() {
-    const saved = localStorage.getItem('ambi360_projects');
-    if (saved) {
-        try {
-            return JSON.parse(saved);
-        } catch (e) {
-            console.warn('Erro ao carregar projetos');
-        }
-    }
+    // Carregado assincronamente no initializeApp
     return {};
 }
 
 function saveProjects() {
-    localStorage.setItem('ambi360_projects', JSON.stringify(projects));
+    // Salvar cada projeto no IndexedDB
+    Object.keys(projects).forEach(async (key) => {
+        try {
+            await saveProjectToDB(key, projects[key]);
+        } catch (e) {
+            console.warn('Erro ao salvar projeto:', e);
+        }
+    });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    projects = loadProjects();
-    setupEventListeners();
-    loadTheme();
+document.addEventListener('DOMContentLoaded', async function() {
+    await initializeApp();
 });
 
+async function initializeApp() {
+    console.log('Inicializando app...');
+    
+    try {
+        await initDB();
+        projects = await loadAllProjectsFromDB();
+        
+        // Se não há projetos, criar o padrão
+        if (Object.keys(projects).length === 0) {
+            projects = { ...DEFAULT_PROJECTS };
+            await saveProjectToDB('projeto-demo', DEFAULT_PROJECTS['projeto-demo']);
+        }
+        
+        console.log('Projetos carregados:', Object.keys(projects));
+        
+        setupEventListeners();
+        loadTheme();
+        
+        console.log('App inicializado com sucesso');
+    } catch (error) {
+        console.error('Erro ao inicializar:', error);
+        // Fallback para localStorage se IndexedDB falhar
+        projects = { ...DEFAULT_PROJECTS };
+        setupEventListeners();
+        loadTheme();
+    }
+}
+
 function setupEventListeners() {
+    // Login admin
     const adminForm = document.getElementById('adminForm');
     if (adminForm) {
         adminForm.addEventListener('submit', handleAdminLogin);
     }
 
+    // Upload de arquivos
     const logoUpload = document.getElementById('logoUpload');
     if (logoUpload) {
         logoUpload.addEventListener('change', handleLogoUpload);
@@ -52,6 +168,7 @@ function setupEventListeners() {
         imageUpload.addEventListener('change', handleImageUpload);
     }
 
+    // Controles de hotspot
     const addHotspotBtn = document.getElementById('addHotspotBtn');
     if (addHotspotBtn) {
         addHotspotBtn.addEventListener('click', () => setAddHotspotMode(true));
@@ -62,11 +179,13 @@ function setupEventListeners() {
         removeHotspotBtn.addEventListener('click', removeAllHotspots);
     }
 
+    // Criar projeto
     const createProjectForm = document.getElementById('createProjectForm');
     if (createProjectForm) {
         createProjectForm.addEventListener('submit', handleCreateProject);
     }
 
+    // Logout
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
     if (adminLogoutBtn) {
         adminLogoutBtn.addEventListener('click', logout);
@@ -75,21 +194,56 @@ function setupEventListeners() {
 
 function handleAdminLogin(e) {
     e.preventDefault();
+    console.log('Login tentativa iniciada');
     
     const passwordInput = document.getElementById('adminPassword');
     if (!passwordInput) {
-        showError('Campo de senha não encontrado');
+        console.error('Campo de senha não encontrado');
         return;
     }
     
     const password = passwordInput.value;
     
-    if (password === ADMIN_PASSWORD) {
+    // Mostrar loading
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Entrando...';
+    submitBtn.disabled = true;
+    
+    // Autenticar no backend via API (/api/auth/login). Usuário padrão: 'admin'
+    fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Erro na autenticação');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Login bem-sucedido:', data);
+        
+        // Armazenar token para uso futuro
+        if (data && data.data && data.data.token) {
+            localStorage.setItem('ambi360_token', data.data.token);
+        }
+
         hideError();
         showAdminPanel();
-    } else {
-        showError('Senha incorreta');
-    }
+    })
+    .catch(err => {
+        console.error('Erro ao autenticar admin:', err);
+        showError(err.message || 'Senha incorreta ou erro de autenticação');
+    })
+    .finally(() => {
+        // Restaurar botão
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    });
 }
 
 function showAdminPanel() {
@@ -142,7 +296,7 @@ function createProjectCard(name, project) {
     return card;
 }
 
-function handleCreateProject(e) {
+async function handleCreateProject(e) {
     e.preventDefault();
     
     const nameRaw = document.getElementById('newProjectName').value.trim();
@@ -157,42 +311,45 @@ function handleCreateProject(e) {
     if (projects[name] && !editingProjectName) return showToast('Projeto já existe!', 'danger');
 
     if (editingProjectName && !imageFile) {
-        updateExistingProject(name, title, logoFile);
+        await updateExistingProject(name, title, logoFile);
     } else {
-        createNewProject(name, title, imageFile, logoFile);
+        await createNewProject(name, title, imageFile, logoFile);
     }
 }
 
 function createNewProject(name, title, imageFile, logoFile) {
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         const projectData = {
-            image: e.target.result,
+            image: e.target.result, // Manter imagem original
             title: title,
             hotspots: [...hotspots],
             createdAt: editingProjectName ? projects[editingProjectName].createdAt : new Date().toISOString(),
             logo: null
         };
         
+        // Processar logo se fornecida
         if (logoFile) {
             const logoReader = new FileReader();
-            logoReader.onload = function(logoEvent) {
+            logoReader.onload = async function(logoEvent) {
                 projectData.logo = logoEvent.target.result;
-                saveProject(name, projectData);
+                await saveProject(name, projectData);
             };
             logoReader.readAsDataURL(logoFile);
         } else {
-            saveProject(name, projectData);
+            await saveProject(name, projectData);
         }
     };
     reader.readAsDataURL(imageFile);
 }
 
-function updateExistingProject(name, title, logoFile) {
+async function updateExistingProject(name, title, logoFile) {
     const existingProject = projects[editingProjectName];
     if (!existingProject) return;
     
+    // Se o nome mudou, deletar o projeto antigo do IndexedDB
     if (editingProjectName !== name) {
+        await deleteProjectFromDB(editingProjectName);
         delete projects[editingProjectName];
     }
     
@@ -206,22 +363,27 @@ function updateExistingProject(name, title, logoFile) {
     
     if (logoFile) {
         const logoReader = new FileReader();
-        logoReader.onload = function(e) {
+        logoReader.onload = async function(e) {
             projectData.logo = e.target.result;
-            saveProject(name, projectData);
+            await saveProject(name, projectData);
         };
         logoReader.readAsDataURL(logoFile);
     } else {
-        saveProject(name, projectData);
+        await saveProject(name, projectData);
     }
 }
 
-function saveProject(name, projectData) {
+async function saveProject(name, projectData) {
     projects[name] = projectData;
-    saveProjects();
     
-    const message = editingProjectName ? 'Projeto atualizado!' : 'Projeto criado!';
-    showToast(message, 'success');
+    try {
+        await saveProjectToDB(name, projectData);
+        const message = editingProjectName ? 'Projeto atualizado!' : 'Projeto criado!';
+        showToast(message, 'success');
+    } catch (error) {
+        console.error('Erro ao salvar:', error);
+        showToast('Erro ao salvar projeto', 'danger');
+    }
     
     resetCreateForm();
     showSection('projects');
@@ -248,6 +410,7 @@ function showViewer(projectName) {
         projectLogo.style.display = 'none';
     }
     
+    // Carregar hotspots do projeto
     projectHotspots = project.hotspots || [];
     currentScene = 'main';
     
@@ -277,6 +440,7 @@ function initializeViewer(project) {
             
             viewer.on('scenechange', handleSceneChange);
         } else {
+            // Carregar hotspots diretamente na cena principal se não há cenas múltiplas
             viewer = pannellum.viewer('panorama', {
                 type: 'equirectangular',
                 panorama: project.image,
@@ -297,6 +461,7 @@ function initializeViewer(project) {
     }
 }
 
+// Função para criar hotspots da cena principal
 function createMainSceneHotspots(hotspotsArray) {
     if (!hotspotsArray || hotspotsArray.length === 0) return [];
     
@@ -327,6 +492,7 @@ function createScenesConfig(mainImage, hotspotsArray) {
         } 
     };
     
+    // Filtrar pontos ROOT para cena principal
     const rootHotspots = hotspotsArray.filter(h => !h.parentId);
     
     rootHotspots.forEach(hotspot => {
@@ -340,10 +506,12 @@ function createScenesConfig(mainImage, hotspotsArray) {
             cssClass: getHotspotClass(hotspot.type, hotspot.typeImage)
         });
         
+        // Criar cena se tem imagem de destino
         if (hotspot.targetImage) {
             const sceneId = 'scene_' + hotspot.id;
             const hotSpots = [];
             
+            // Botão voltar
             hotSpots.push({
                 id: `back_${sceneId}`,
                 pitch: -10,
@@ -354,6 +522,7 @@ function createScenesConfig(mainImage, hotspotsArray) {
                 cssClass: 'hotspot-back'
             });
             
+            // Filhos diretos
             const childHotspots = hotspotsArray.filter(child => child.parentId === hotspot.id);
             childHotspots.forEach(child => {
                 hotSpots.push({
@@ -377,7 +546,6 @@ function createScenesConfig(mainImage, hotspotsArray) {
     
     return scenes;
 }
-
 function updateNavigation() {
     const navRooms = document.getElementById('navRooms');
     if (!navRooms) return;
@@ -389,6 +557,7 @@ function updateNavigation() {
     mainBtn.textContent = 'Cena Principal';
     navRooms.appendChild(mainBtn);
     
+    // Mostrar hotspots com imagens como navegação
     const mainHotspots = projectHotspots.filter(h => !h.parentId && h.targetImage);
     
     mainHotspots.forEach((hotspot) => {
@@ -403,8 +572,10 @@ function updateNavigation() {
 }
 
 function handleSceneChange(sceneId) {
+    console.log('Mudou para cena:', sceneId);
     currentScene = sceneId;
     
+    // Atualizar navegação ativa
     const navButtons = document.querySelectorAll('.nav-room');
     navButtons.forEach(btn => btn.classList.remove('active'));
     
@@ -448,12 +619,17 @@ function editProject(name) {
     showSection('create');
 }
 
-function deleteProject(name) {
+async function deleteProject(name) {
     if (confirm(`Excluir projeto "${projects[name].title}"?`)) {
-        delete projects[name];
-        saveProjects();
-        updateProjectsGrid();
-        showToast('Projeto excluído.', 'success');
+        try {
+            await deleteProjectFromDB(name);
+            delete projects[name];
+            updateProjectsGrid();
+            showToast('Projeto excluído.', 'success');
+        } catch (error) {
+            console.error('Erro ao excluir:', error);
+            showToast('Erro ao excluir projeto', 'danger');
+        }
     }
 }
 
@@ -705,6 +881,7 @@ function changeHotspotType(id, type) {
     if (hotspot) {
         hotspot.type = type;
         
+        // Alternar imagem baseada no tipo
         if (type === 'door') {
             hotspot.typeImage = hotspot.typeImage === 'porta 1.png' ? 'porta 2.png' : 'porta 1.png';
         } else {
@@ -753,7 +930,7 @@ function updateHotspotImage(id, input) {
             if (hotspot) {
                 hotspot.targetImage = e.target.result;
                 updateHotspotsList();
-                showToast('Cena conectada!', 'success');
+                showToast('Cena conectada! Você pode entrar e adicionar pontos dentro dela.', 'success');
             }
         };
         reader.readAsDataURL(file);
@@ -959,68 +1136,5 @@ function loadTheme() {
     if (btn) {
         const isDark = document.body.classList.contains('dark');
         btn.textContent = isDark ? 'Modo Claro' : 'Modo Escuro';
-    }
-}
-
-// Funções de filtro e navegação
-function toggleFilterDropdown() {
-    const dropdown = document.getElementById('filterDropdown');
-    dropdown.classList.toggle('hidden');
-}
-
-function sortProjects(type) {
-    const projectEntries = Object.entries(projects);
-    
-    switch(type) {
-        case 'newest':
-            projectEntries.sort((a, b) => new Date(b[1].createdAt) - new Date(a[1].createdAt));
-            break;
-        case 'oldest':
-            projectEntries.sort((a, b) => new Date(a[1].createdAt) - new Date(b[1].createdAt));
-            break;
-        case 'alphabetical':
-            projectEntries.sort((a, b) => a[1].title.localeCompare(b[1].title));
-            break;
-        case 'alphabetical-reverse':
-            projectEntries.sort((a, b) => b[1].title.localeCompare(a[1].title));
-            break;
-    }
-    
-    const sortedProjects = {};
-    projectEntries.forEach(([key, value]) => {
-        sortedProjects[key] = value;
-    });
-    projects = sortedProjects;
-    
-    updateProjectsGrid();
-    toggleFilterDropdown();
-}
-
-function filterNavigation(searchTerm) {
-    const rooms = document.querySelectorAll('.nav-room');
-    rooms.forEach(room => {
-        const text = room.textContent.toLowerCase();
-        const matches = text.includes(searchTerm.toLowerCase());
-        room.style.display = matches ? 'block' : 'none';
-    });
-}
-
-function shareCurrentView() {
-    const url = window.location.href;
-    if (navigator.share) {
-        navigator.share({
-            title: 'AMBI360 - Tour Virtual',
-            url: url
-        });
-    } else {
-        navigator.clipboard.writeText(url).then(() => {
-            showToast('Link copiado!', 'success');
-        });
-    }
-}
-
-function goBackToPreviousScene() {
-    if (viewer && currentScene !== 'main') {
-        viewer.loadScene('main');
     }
 }

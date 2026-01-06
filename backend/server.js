@@ -7,28 +7,50 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
-const { testConnection } = require('./config/db');
-const { config, validateConfig } = require('./config/app.config');
-const { createRateLimit } = require('./middleware/auth.middleware');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.APP_PORT || config.server.port || 3001;
+const PORT = process.env.APP_PORT || 3005;
 
-// Validar configurações
-validateConfig();
+// Função simples para testar conexão
+const testConnection = async () => {
+    try {
+        const mysql = require('mysql2/promise');
+        const connection = await mysql.createConnection({
+            host: process.env.DB_HOST || 'localhost',
+            port: process.env.DB_PORT || 3306,
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'ambi360_db'
+        });
+        await connection.end();
+        return true;
+    } catch (error) {
+        console.warn('⚠️ Banco de dados não conectado:', error.message);
+        return false;
+    }
+};
+
+// Rate limiting simples
+const createRateLimit = () => {
+    const rateLimit = require('express-rate-limit');
+    return rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100,
+        message: { success: false, message: 'Muitas tentativas' }
+    });
+};
+
+// Configuração básica
+const config = {
+    app: { name: 'AMBI360', version: '1.0.0' },
+    server: { env: process.env.NODE_ENV || 'development' },
+    paths: { frontend: '../frontend', uploads: '../uploads' }
+};
 
 // Middlewares de segurança
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.pannellum.org"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.pannellum.org"],
-            imgSrc: ["'self'", "data:", "blob:", "https:"],
-            connectSrc: ["'self'"]
-        }
-    }
+    contentSecurityPolicy: false // Desabilitar temporariamente para desenvolvimento
 }));
 
 // Rate limiting global
@@ -69,13 +91,17 @@ app.use('/uploads', express.static(path.join(__dirname, config.paths.uploads), {
     etag: true
 }));
 
-// Rotas da API
-app.use('/api/auth', require('./routes/auth.routes'));
-app.use('/api/projects', require('./routes/projects.routes'));
-app.use('/api/hotspots', require('./routes/hotspots.routes'));
-app.use('/api/progress', require('./routes/progress.routes'));
-app.use('/api/admin', require('./routes/admin.routes'));
-app.use('/api/upload', require('./routes/upload.routes'));
+// Rotas da API (com tratamento de erro)
+try {
+    app.use('/api/auth', require('./routes/auth.routes'));
+    app.use('/api/projects', require('./routes/projects.routes'));
+    app.use('/api/hotspots', require('./routes/hotspots.routes'));
+    app.use('/api/progress', require('./routes/progress.routes'));
+    app.use('/api/admin', require('./routes/admin.routes'));
+    app.use('/api/upload', require('./routes/upload.routes'));
+} catch (error) {
+    console.warn('⚠️ Algumas rotas da API não puderam ser carregadas:', error.message);
+}
 
 // Rota principal - servir o frontend
 app.get('/', (req, res) => {
@@ -91,7 +117,7 @@ app.get('/api/health', async (req, res) => {
             app: {
                 name: config.app.name,
                 version: config.app.version,
-                env: process.env.NODE_ENV || config.server.env
+                env: process.env.NODE_ENV || 'development'
             },
             database: dbStatus ? 'connected' : 'disconnected',
             timestamp: new Date().toISOString()
@@ -129,12 +155,12 @@ app.use('*', (req, res) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('SIGTERM recebido, encerrando servidor...');
+    console.log('\n🔄 SIGTERM recebido, encerrando servidor...');
     process.exit(0);
 });
 
 process.on('SIGINT', () => {
-    console.log('SIGINT recebido, encerrando servidor...');
+    console.log('\n🔄 SIGINT recebido, encerrando servidor...');
     process.exit(0);
 });
 
@@ -145,14 +171,20 @@ async function startServer() {
         const dbConnected = await testConnection();
         if (!dbConnected) {
             console.warn('⚠️ Servidor iniciado sem conexão com banco de dados');
+            console.warn('⚠️ Funcionando apenas com localStorage no frontend');
+        } else {
+            console.log('✅ Banco de dados conectado');
         }
         
-        app.listen(PORT, '0.0.0.0', () => {
+        app.listen(PORT, () => {
             console.log(`🚀 ${config.app.name} v${config.app.version} rodando na porta ${PORT}`);
             console.log(`📱 Frontend: http://localhost:${PORT}`);
             console.log(`🔧 API: http://localhost:${PORT}/api`);
-            console.log(`📚 Docs: Veja API_DOCUMENTATION.md`);
-            console.log(`🌍 Ambiente: ${process.env.NODE_ENV || config.server.env}`);
+            console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+            console.log('\n=== INSTRUÇÕES ===');
+            console.log('1. Acesse: http://localhost:' + PORT);
+            console.log('2. Senha admin: admin123');
+            console.log('3. Crie seus projetos 360°');
         });
     } catch (error) {
         console.error('❌ Erro ao iniciar servidor:', error);
