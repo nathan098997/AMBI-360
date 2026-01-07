@@ -1121,3 +1121,118 @@ function showShareFeedback() {
     
     showToast('Link público copiado! Funciona em qualquer dispositivo.', 'success');
 }
+
+// Funcionalidades de Compartilhamento com dados completos
+function showShareModal() {
+    if (!currentProjectName) return;
+    
+    const project = projects[currentProjectName];
+    if (!project) return;
+    
+    const modal = document.getElementById('shareModal');
+    const shareUrl = document.getElementById('shareUrl');
+    const embedCode = document.getElementById('embedCode');
+    
+    // Criar dados completos do projeto para compartilhamento
+    const shareData = {
+        t: project.title,
+        i: project.image,
+        l: project.logo || null,
+        h: project.hotspots || []
+    };
+    
+    // Comprimir dados para URL
+    const compressed = btoa(JSON.stringify(shareData));
+    
+    // Usar URL atual como base
+    const baseUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+    const projectUrl = `${baseUrl}?d=${compressed}`;
+    
+    shareUrl.value = projectUrl;
+    embedCode.value = `<iframe src="${projectUrl}" width="800" height="600" frameborder="0" allowfullscreen></iframe>`;
+    
+    modal.classList.remove('hidden');
+}
+
+function closeShareModal() {
+    document.getElementById('shareModal').classList.add('hidden');
+}
+
+function copyShareUrl() {
+    const shareUrl = document.getElementById('shareUrl');
+    copyToClipboard(shareUrl.value, 'Link copiado com sucesso!');
+}
+
+function copyEmbedCode() {
+    const embedCode = document.getElementById('embedCode');
+    copyToClipboard(embedCode.value, 'Código copiado com sucesso!');
+}
+
+function copyToClipboard(text, successMessage) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showShareToast(successMessage);
+        }).catch(() => {
+            fallbackCopyToClipboard(text, successMessage);
+        });
+    } else {
+        fallbackCopyToClipboard(text, successMessage);
+    }
+}
+
+function fallbackCopyToClipboard(text, successMessage) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        document.execCommand('copy');
+        showShareToast(successMessage);
+    } catch (err) {
+        console.error('Erro ao copiar:', err);
+        prompt('Copie o texto abaixo:', text);
+    }
+    
+    textArea.remove();
+}
+
+function showShareToast(message) {
+    const toast = document.getElementById('shareToast');
+    const messageElement = toast.querySelector('.toast-message');
+    
+    messageElement.textContent = message;
+    toast.classList.remove('hidden');
+    
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 3000);
+}
+
+function shareOnWhatsApp() {
+    const shareUrl = document.getElementById('shareUrl').value;
+    const text = encodeURIComponent(`Confira este tour virtual 360°: ${shareUrl}`);
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+function shareOnFacebook() {
+    const shareUrl = document.getElementById('shareUrl').value;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+}
+
+function shareOnTwitter() {
+    const shareUrl = document.getElementById('shareUrl').value;
+    const text = encodeURIComponent(`Confira este tour virtual 360°`);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+}
+
+function shareByEmail() {
+    const shareUrl = document.getElementById('shareUrl').value;
+    const subject = encodeURIComponent('Tour Virtual 360°');
+    const body = encodeURIComponent(`Olá!\n\nGostaria de compartilhar este tour virtual 360° com você:\n\n${shareUrl}\n\nAproveite a experiência!`);
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+}
