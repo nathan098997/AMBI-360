@@ -323,8 +323,16 @@
                             projectLogo.style.display = 'block';
                         }
                         
-                        // Inicializar viewer
+                        // Inicializar viewer com hotspots
                         setTimeout(() => {
+                            const hotspots = (data.h || []).map(h => ({
+                                id: h.id,
+                                pitch: h.pitch,
+                                yaw: h.yaw,
+                                type: 'info',
+                                text: h.text
+                            }));
+                            
                             const viewer = pannellum.viewer('panorama', {
                                 type: 'equirectangular',
                                 panorama: data.i,
@@ -333,19 +341,29 @@
                                 compass: true,
                                 showZoomCtrl: true,
                                 showFullscreenCtrl: true,
-                                yaw: 0
+                                yaw: 0,
+                                hotSpots: hotspots
                             });
                             
                             // Ocultar navegação lateral para visualização pública
                             document.getElementById('navSidebar').style.display = 'none';
                             
-                            // Ajustar botões para visualização pública
+                            // Remover botões admin para visualização pública
                             document.getElementById('shareBtn').style.display = 'none';
-                            document.getElementById('backBtn').style.display = 'none';
                         }, 100);
                     }
                 } catch (e) {
                     console.error('Erro ao carregar projeto compartilhado:', e);
+                    // Se erro, mostrar mensagem amigável
+                    document.body.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #f1f5f9; font-family: Arial, sans-serif;">
+                            <div style="text-align: center; color: #64748b; max-width: 400px; padding: 40px;">
+                                <div style="font-size: 64px; margin-bottom: 20px;">⚠️</div>
+                                <h2 style="font-size: 24px; margin-bottom: 15px; color: #334155;">Link inválido</h2>
+                                <p style="font-size: 16px; margin-bottom: 30px;">O link do tour virtual está corrompido ou inválido.</p>
+                            </div>
+                        </div>
+                    `;
                 }
             }
         });
