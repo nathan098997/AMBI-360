@@ -235,5 +235,59 @@
 
     <script src="https://cdn.pannellum.org/2.5/pannellum.js"></script>
     <script src="script.js"></script>
+    <script>
+        // Verificar se há dados de projeto compartilhado na URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectData = urlParams.get('d');
+            
+            if (projectData) {
+                // Se há dados de projeto, carregar diretamente o visualizador
+                try {
+                    const data = JSON.parse(atob(projectData));
+                    if (data.i && data.t) {
+                        // Ocultar login e mostrar viewer
+                        document.getElementById('loginContainer').classList.add('hidden');
+                        document.getElementById('viewerContainer').classList.remove('hidden');
+                        
+                        // Configurar título
+                        document.getElementById('projectTitle').textContent = data.t;
+                        document.getElementById('navProjectTitle').textContent = data.t;
+                        document.title = data.t + ' - AMBI360';
+                        
+                        // Configurar logo se existir
+                        const projectLogo = document.getElementById('projectLogo');
+                        if (data.l) {
+                            projectLogo.src = data.l;
+                            projectLogo.style.display = 'block';
+                        }
+                        
+                        // Inicializar viewer
+                        setTimeout(() => {
+                            const viewer = pannellum.viewer('panorama', {
+                                type: 'equirectangular',
+                                panorama: data.i,
+                                autoLoad: true,
+                                autoRotate: -2,
+                                compass: true,
+                                showZoomCtrl: true,
+                                showFullscreenCtrl: true,
+                                yaw: 0
+                            });
+                            
+                            // Ocultar navegação lateral para visualização pública
+                            document.getElementById('navSidebar').style.display = 'none';
+                            
+                            // Ajustar botões para visualização pública
+                            document.getElementById('shareBtn').style.display = 'none';
+                            document.getElementById('backBtn').style.display = 'none';
+                        }, 100);
+                    }
+                } catch (e) {
+                    console.error('Erro ao carregar projeto compartilhado:', e);
+                }
+            }
+        });
+    </script>
 </body>
 </html>
