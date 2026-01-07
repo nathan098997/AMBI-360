@@ -60,7 +60,7 @@
                     <h1 class="viewer-title" id="projectTitle"></h1>
                 </div>
                 <div class="viewer-controls">
-                    <button class="control-btn" id="shareBtn" onclick="shareCurrentView()">🔗 Compartilhar</button>
+                    <button class="control-btn" id="shareBtn" onclick="showShareModal()">🔗 Compartilhar</button>
                     <button class="control-btn" onclick="toggleFullscreen()">⛶ Tela Cheia</button>
                     <button class="control-btn" onclick="showHelpModal()">❓ Ajuda</button>
                 </div>
@@ -231,6 +231,67 @@
                 <button class="btn-primary" onclick="closeHelpModal()">Entendi</button>
             </div>
         </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="hidden">
+        <div class="modal-backdrop" onclick="closeShareModal()"></div>
+        <div class="modal-content share-modal">
+            <div class="modal-header">
+                <h2>🔗 Compartilhar Tour Virtual</h2>
+                <button class="modal-close" onclick="closeShareModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="share-section">
+                    <h3>Link do Tour</h3>
+                    <p>Compartilhe este link para acesso direto ao tour virtual:</p>
+                    <div class="share-url-container">
+                        <input type="text" id="shareUrl" class="share-url-input" readonly>
+                        <button class="btn-primary" onclick="copyShareUrl()">📋 Copiar</button>
+                    </div>
+                </div>
+                
+                <div class="share-section">
+                    <h3>Código para Incorporar</h3>
+                    <p>Use este código HTML para incorporar o tour em seu site:</p>
+                    <div class="share-url-container">
+                        <textarea id="embedCode" class="share-embed-textarea" readonly></textarea>
+                        <button class="btn-primary" onclick="copyEmbedCode()">📋 Copiar</button>
+                    </div>
+                </div>
+                
+                <div class="share-section">
+                    <h3>Compartilhar em Redes Sociais</h3>
+                    <div class="social-buttons">
+                        <button class="btn-social whatsapp" onclick="shareOnWhatsApp()">
+                            <span>📱</span>
+                            WhatsApp
+                        </button>
+                        <button class="btn-social facebook" onclick="shareOnFacebook()">
+                            <span>📸</span>
+                            Facebook
+                        </button>
+                        <button class="btn-social twitter" onclick="shareOnTwitter()">
+                            <span>🐦</span>
+                            Twitter
+                        </button>
+                        <button class="btn-social email" onclick="shareByEmail()">
+                            <span>📧</span>
+                            Email
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeShareModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Success Toast -->
+    <div id="shareToast" class="share-toast hidden">
+        <span class="toast-icon">✅</span>
+        <span class="toast-message">Link copiado com sucesso!</span>
     </div>
 
     <script src="https://cdn.pannellum.org/2.5/pannellum.js"></script>
